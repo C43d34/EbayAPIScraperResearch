@@ -5,10 +5,14 @@ import json
 import os.path
 import copy
 import math
+import sys
+import openpyxl
 
 import ebayAPIFuncLib
 
 MANUFACTUER_DB = ["Gigabyte", "MSI", "Asus", "Asrock", "ProArt"]
+
+COLUMN_LABELS = ["CHECKED", "BUYABLE", "EST. RETURN", "EST. RETURN %" , "BRAND", "NAME", "LISTING TITLE", "LISTING TYPE", "PRICE", "CUR AVG USED PRICE", "CUR MIN USED PRICE", "CUR MAX USED PRICE", "LISTING LINK"]
 
 GENERIC_MOBO_SEARCH_PARAMS = {
     "q": { #keyswords concatenated into a string => 
@@ -48,7 +52,7 @@ USED_MOBO_SALES_SEARCH_PARAMS = {
     # "offset": "0" #specifies number of items to skip in result set (control pagination of the output) 
 }
 
-def compileMotherboardData():
+def compileMotherboardData(output_csv_file_name: str):
 #Search a generic list of motherboards for sale 
     #Z690, Z790, AMD motherboards..... LGA Sockets only
     #Filter for "for parts" condition
@@ -81,20 +85,21 @@ def compileMotherboardData():
     motherboard_used_pricing_results_by_mpn = getUsedMotherboardPrices(unique_motherboard_mpn_set, results_limit_per_mpn = 10) 
 
 # #Build a basic spreadsheet with the average historical sale price of each motherboard and the current going price for "for parts" motherboards 
-    data = buildMotherboardSpreadsheet(modified_broad_search_results, motherboard_used_pricing_results_by_mpn)
-    with open("motherboard_data" + str(datetime.date(datetime.now())) + ".csv", "w", newline='') as output_csvfile:
-        writer = csv.writer(output_csvfile)
-        writer.writerows(data)
+    buildMotherboardSpreadsheet(modified_broad_search_results, motherboard_used_pricing_results_by_mpn)
+    # with open(output_csv_file_name, "w", newline='') as output_csvfile:
+        # writer = csv.writer(output_csvfile)
+        # writer.writerows(data)
 
 
 
-def getMotherboardDetailsByItemID(item_id: str, log_no_mpn_api_response = True, ignore_no_mpn_exception = False) -> tuple[str, str]:
+def getMotherboardDetailsByItemID(item_id: str, log_no_mpn_api_response = True, ignore_no_mpn_exception = False) -> tuple[str, str, str]:
     '''
     Returns a tuple
         0. Brand name 
         1. MPN (manufacturer's product name) 
         2. url (direct link to listing which tends to be shorter than item summaries url)
     '''
+    output_dict = {}
     brand = ""
     mpn = ""
     url = ""
@@ -104,7 +109,7 @@ def getMotherboardDetailsByItemID(item_id: str, log_no_mpn_api_response = True, 
         raise Exception("Ebay API item details method unsuccessful\nResponse code: " + str(response_status))
     else:
         if ("brand" in response):
-            brand = response["brand"]
+                brand = response["brand"]
         if ("mpn" in response):
             mpn = response["mpn"]
         elif ("localizedAspects" in response): #check localized aspects to get MPN if MPN wasn't specified 
@@ -119,7 +124,7 @@ def getMotherboardDetailsByItemID(item_id: str, log_no_mpn_api_response = True, 
             f = open("error_item_details_response_debug.json", 'w')
             json.dump(response, f, indent = 4)
             if (ignore_no_mpn_exception == False):
-                raise Exception("MPN Not found from item details search.Copying return details to file 'error_item_details_debug_response.json'\nItemId = " + item_id)
+                raise Exception("MPN Not found from item details search. Copying return details to file 'error_item_details_debug_response.json'\nItemId = " + item_id)
 
     return brand, mpn, url
 
@@ -193,25 +198,29 @@ def findUsedMotherboardHistory(motherboard_mpn_set: list, months_to_search = 6)-
     return used_motherboard_historical_sale_pricing 
 
 
-def buildMotherboardSpreadsheet(motherboard_data: dict, motherboard_used_pricing_results_by_mpn: dict) -> list[list]:
+def buildMotherboardSpreadsheet(motherboard_data: dict, motherboard_used_pricing_results_by_mpn: dict, output_excel_sheet_name: str):
     '''
     #Parses scraped motherboard data and historical motherboard data and prepares it for csv format
 
-    #COLUMN_LABELS = ["CHIPSET", "BRAND", "NAME", "LISTING TITLE", "LISTING TYPE", "PRICE", "CUR AVG USED PRICE", "CUR MIN USED PRICE", "CUR MAX USED PRICE", "LISTING LINK"]
+    #COLUMN_LABELS = ["CHECKED", "BUYABLE", "EST. RETURN", "EST. RETURN %" , "BRAND", "NAME", "LISTING TITLE", "LISTING TYPE", "PRICE", "CUR AVG USED PRICE", "CUR MIN USED PRICE", "CUR MAX USED PRICE", "LISTING LINK"]
+
     
     #Returns a list of lists, where each list is a row and inside are the values for each column
     '''
-    COLUMN_LABELS = ["EST. RETURN", "EST. RETURN %" , "BRAND", "NAME", "LISTING TITLE", "LISTING TYPE", "PRICE", "CUR AVG USED PRICE", "CUR MIN USED PRICE", "CUR MAX USED PRICE", "LISTING LINK", "L_COL", "M_COL"]
+    COLUMN_LABELS = ["CHECKED", "BUYABLE", "EST. RETURN", "EST. RETURN %" , "BRAND", "NAME", "LISTING TITLE", "LISTING TYPE", "PRICE", "CUR AVG USED PRICE", "CUR MIN USED PRICE", "CUR MAX USED PRICE", "LISTING LINK"]
 
-    list_of_rows = [COLUMN_LABELS]
+    list_of_new_rows = [COLUMN_LABELS]
     empty_val_keyword = 0.0
 
     for item_row in range(0, len(motherboard_data["itemSummaries"])):
         item_listing = motherboard_data["itemSummaries"][item_row]
         new_row = [empty_val_keyword for i in range(0, len(COLUMN_LABELS))] 
         
+        new_row[COLUMN_LABELS.index("CHECKED")] = "FALSE"
+        new_row[COLUMN_LABELS.index("BUYABLE")] = "FALSE"
         new_row[COLUMN_LABELS.index("BRAND")] = item_listing["brand"] if "brand" in item_listing else empty_val_keyword
-        new_row[COLUMN_LABELS.index("LISTING TITLE")] = item_listing["title"] if "title" in item_listing else empty_val_keyword
+        listing_title = item_listing["title"] if "title" in item_listing else "Unknown"
+        new_row[COLUMN_LABELS.index("LISTING TITLE")] = "=HYPERLINK(" + chr(COLUMN_LABELS.index("LISTING LINK")) + str(item_row+2)+ "," + f"\"{listing_title}\")" if "itemWebUrl" in item_listing else listing_title
         new_row[COLUMN_LABELS.index("LISTING TYPE")] = ",".join(item_listing["buyingOptions"]) if "buyingOptions" in item_listing else empty_val_keyword
         
         #pricing = direct pricing + shipping costs if any 
@@ -225,12 +234,7 @@ def buildMotherboardSpreadsheet(motherboard_data: dict, motherboard_used_pricing
         #Excel hyper link formatting 
         if ("itemWebUrl" in item_listing and len(item_listing["itemWebUrl"]) > 0):
             hyper_link = item_listing["itemWebUrl"] if "itemWebUrl" in item_listing else empty_val_keyword
-
-            new_row[COLUMN_LABELS.index("L_COL")] = hyper_link.split("?")[0]
-            #if split hyper link into two
-            # new_row[COLUMN_LABELS.index("L_COL")] = hyper_link[0:math.floor(len(hyper_link)/2)]
-            # new_row[COLUMN_LABELS.index("M_COL")] = hyper_link[math.floor(len(hyper_link)/2+1):len(hyper_link)]
-            new_row[COLUMN_LABELS.index("LISTING LINK")] = "=HYPERLINK(" + "L" + str(item_row+2)+ "," + "\"Linkybinky\")" if "itemWebUrl" in item_listing else empty_val_keyword
+            new_row[COLUMN_LABELS.index("LISTING LINK")] = hyper_link.split("?")[0]
 
         #Formatting in reference pricing details of used motherboards of this mpn type currently for sale 
         if ("mpn" in item_listing and item_listing["mpn"] != ""):
@@ -251,10 +255,50 @@ def buildMotherboardSpreadsheet(motherboard_data: dict, motherboard_used_pricing
             new_row[COLUMN_LABELS.index("EST. RETURN")] = float(new_row[COLUMN_LABELS.index("CUR MIN USED PRICE")]) - float(new_row[COLUMN_LABELS.index("PRICE")])
             new_row[COLUMN_LABELS.index("EST. RETURN %")] = (float(new_row[COLUMN_LABELS.index('EST. RETURN')]) / float(new_row[COLUMN_LABELS.index('PRICE')])) if float(new_row[COLUMN_LABELS.index("PRICE")]) != 0.0 else 0.0
 
-        list_of_rows.append(new_row)
+        list_of_new_rows.append(new_row)
 
-    return list_of_rows
+    #If a spreadsheet already exists with the given csv file name, add its data to the current data set (skip duplicates = use the most recent acquisition of that data)
+    if (output_excel_sheet_name in os.listdir() and os.path.isfile(output_excel_sheet_name)):
+        mergeDataToExistingExcelSheet(list_of_new_rows, output_excel_sheet_name)
 
 
 
-compileMotherboardData()
+def mergeDataToExistingExcelSheet(new_data: list, existing_sheet_name: str):
+    excel_workbook = openpyxl.load_workbook(filename= existing_sheet_name)
+    active_excel_sheet = excel_workbook.active 
+
+    #put new data into dict because we love hashmaps! 
+        #(hashmap is nice for this next part but probably not technically necessary)
+    new_data_map_link_to_array_position = {}
+    for i, new_data_row in enumerate(new_data[1:]): #skip first row (header row)
+        new_data_map_link_to_array_position[new_data_row[COLUMN_LABELS.index("LISTING LINK")]] = i+1  
+            #using LISTING LINK as key (the link to the listing)
+                # it should be unique for each item (which will help for checking duplicates in the next portion of code)
+                # AND I don't expect that to change when rescanning the same listing.  
+
+
+
+    #check and update duplicates part
+    existing_rows = {}
+    active_excel_sheet.row_dimensions
+    for i, line in enumerate(list(active_excel_sheet.iter_rows(min_row=2, values_only=True))): 
+        active_excel_sheet.cell(row=i+1, column=1).value = 5 #replaces the value of all cells in the collumn #1 (excel sheet is 1 indexed not 0 index) with the value specified value
+
+
+    return
+
+
+def main():
+    #read command line arguments
+    arguments_passed = len(sys.argv)
+
+    #first argument will be path (and name) to a file that will become the .csv output log
+    if (arguments_passed > 0):
+        csv_output_file = sys.argv[1]
+    else:
+        csv_output_file = "motherboard_data" + str(datetime.date(datetime.now())) + ".csv"
+
+    compileMotherboardData(csv_output_file)
+    return
+
+main()

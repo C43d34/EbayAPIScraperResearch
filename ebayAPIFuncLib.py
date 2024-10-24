@@ -45,7 +45,7 @@ def util_APIFromRawURL(url: str, output_file_name: str):
         print(e.response.dict())
     return
  
-def getSearchResults(request_payload: dict, log_url = False) -> tuple[int, dict]:
+def getSearchResults(request_payload: dict, log_url = False, log_output = False, log_output_path = "last_api_response_debug.json") -> tuple[int, dict]:
     '''
     Perform a search (browse) request through ebay API.
     
@@ -74,9 +74,10 @@ def getSearchResults(request_payload: dict, log_url = False) -> tuple[int, dict]
         response_status = response.status_code
         response_parsed = response.json()
 
-    #(DEBUGGING) dump response to a json file 
-        f = open("last_api_response_debug.json", 'w')
-        json.dump(response_parsed, f, indent = 4)
+    #(DEBUGGING) dump response to a json file
+        if (log_output):
+            f = open(log_output_path, 'w') 
+            json.dump(response_parsed, f, indent = 4)
 
 #Catch exception
     except requests.exceptions.HTTPError as e:
@@ -143,7 +144,7 @@ def buildSearchURL(api_base_url: str, api_params: dict) -> str:
 
 
 
-def getItemDetails(item_id_to_inspect: str, log_url = False) -> tuple[int, dict]:
+def getItemDetails(item_id_to_inspect: str, log_url = False,  log_output = False, log_output_path = "last_api_response_debug.json") -> tuple[int, dict]:
     '''
     Get specific details about an item based on it's item ID
         (Useful for getting standardized Brand & MPN (manufacturer's product number) of the item for later indexing)
@@ -172,9 +173,10 @@ def getItemDetails(item_id_to_inspect: str, log_url = False) -> tuple[int, dict]
         response_status = response.status_code
         response_parsed = response.json()
 
-    #(DEBUGGING) dump response to a json file 
-        f = open("specific_item_id_response_debug.json", 'w')
-        json.dump(response_parsed, f, indent = 4)
+    #(DEBUGGING) dump response to a json file
+        if (log_output): 
+            f = open(log_output_path, 'w')
+            json.dump(response_parsed, f, indent = 4)
 
 #Catch exception
     except requests.exceptions.HTTPError as e:

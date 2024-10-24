@@ -1,1 +1,14 @@
+- Tweaks: 
+    Added more operating options for better debugging and general usage
+    - Can now specify when to log each individual ebay API call and where to log the output too
+    - Can now send the final output of the application with a specific file location/name using command line args 
+        - If the file name already exists, default behavior is to append data to the existing file
+        (automatically handles duplicate entries)
+
+- Feature Add In Progress:
+    Changing over to logging data to excel sheet (.xlsx) over .csv 
+        - Intention is to make it so that changes made directly to the data through excel are reflected in the actual data set. 
+            When the data set and the excel sheet are separate entities, it gets somewhat annoying to make changes to the data and excel sheet at the same time and expect parity between the two. 
+
+
 - TODO: Make calculating price more reliable by improving shipping cost detection. 
