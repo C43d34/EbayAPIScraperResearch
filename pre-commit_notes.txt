@@ -1,14 +1,17 @@
-- Tweaks: 
-    Added more operating options for better debugging and general usage
-    - Can now specify when to log each individual ebay API call and where to log the output too
-    - Can now send the final output of the application with a specific file location/name using command line args 
-        - If the file name already exists, default behavior is to append data to the existing file
-        (automatically handles duplicate entries)
+- Feature Add:
+    Location context for search & improved shipping cost capturing
+        - Properly included the "X-EBAY-C-ENDUSERCTX" header into api calls. Useful for location based stuff such as calculated shipping 
+        - Add the following variable to ebayAPI.py file
+        "CONTEXT_LOCATION" = "country=<your two letter country code>,zip=<your zip code>"
+        (otherwise, will assume this header blank)
 
-- Feature Add In Progress:
-    Changing over to logging data to excel sheet (.xlsx) over .csv 
-        - Intention is to make it so that changes made directly to the data through excel are reflected in the actual data set. 
-            When the data set and the excel sheet are separate entities, it gets somewhat annoying to make changes to the data and excel sheet at the same time and expect parity between the two. 
+    Command arguments option:
+        - output excel file name & path
+        (can specify "mobo_research.py")
+            - If the file already exists, the program will append any new found listing to the excel sheet, while updating existing ones if new information is found. 
 
 
-- TODO: Make calculating price more reliable by improving shipping cost detection. 
+
+            
+
+

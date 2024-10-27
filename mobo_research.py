@@ -7,6 +7,7 @@ import copy
 import math
 import sys
 import openpyxl
+import openpyxl.workbook
 
 import ebayAPIFuncLib
 
@@ -17,7 +18,7 @@ COLUMN_LABELS = ["CHECKED", "BUYABLE", "EST. RETURN", "EST. RETURN %" , "BRAND",
 GENERIC_MOBO_SEARCH_PARAMS = {
     "q": { #keyswords concatenated into a string => 
         "AND": ["Motherboard"], #"k1 k2" space separated means k1 AND k2
-        "OR": ["Z690", "Z790", "B660", "B760", "X670", "X670E", "X870", "X870E"] #"(k1, k2, ...)" comma separated means k1 OR k2 or ... 
+        "OR": ["Z690", "Z790", "B660", "B760", "X670", "X670E", "X870", "X870E", "B850", "B650E"] #"(k1, k2, ...)" comma separated means k1 OR k2 or ... 
                     #could possibly get fancy with OR and AND by having OR be conditionally placed between AND search parameters so we can search for (X or Y) and (A or B)
                     # => "(x, y) (a, b)" is how it would look in url I think
                     #current structing of URL with OR params will just be passed all at once so this conceptual functionality isn't possibly yet. 
@@ -29,7 +30,7 @@ GENERIC_MOBO_SEARCH_PARAMS = {
         }, 
             
     # "sort": "", #sort=price from lowest to highest price (maybe behave strangely with bidding items which I need to look)
-    "limit": "50", #number of items to return per page (max 200, default 50)
+    "limit": "30", #number of items to return per page (max 200, default 50)
     # "offset": "0" #specifies number of items to skip in result set (control pagination of the output) 
 }
 
@@ -48,17 +49,17 @@ USED_MOBO_SALES_SEARCH_PARAMS = {
         }, 
             
     # "sort": "", #sort=price from lowest to highest price (maybe behave strangely with bidding items which I need to look)
-    "limit": "5", #number of items to return per page (max 200, default 50)
+    "limit": "7", #number of items to return per page (max 200, default 50)
     # "offset": "0" #specifies number of items to skip in result set (control pagination of the output) 
 }
 
-def compileMotherboardData(output_csv_file_name: str):
+def compileMotherboardData(output_excel_file_name: str):
 #Search a generic list of motherboards for sale 
     #Z690, Z790, AMD motherboards..... LGA Sockets only
     #Filter for "for parts" condition
 
     # GENERIC_MOBO_SEARCH_PARAMS["filter"]["itemEndDate"] = "[.." + (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ") + "]"
-    response_status, broad_search_results = ebayAPIFuncLib.getSearchResults(GENERIC_MOBO_SEARCH_PARAMS, log_url= True)
+    response_status, broad_search_results = ebayAPIFuncLib.getSearchResults(GENERIC_MOBO_SEARCH_PARAMS, log_url= True, log_output= True, log_output_path= "broad_search_log_response_debug.json")
     if (response_status != 200):
         raise Exception("Ebay API browse method unsuccessful\nResponse code: " + str(response_status))
 
@@ -85,11 +86,12 @@ def compileMotherboardData(output_csv_file_name: str):
     motherboard_used_pricing_results_by_mpn = getUsedMotherboardPrices(unique_motherboard_mpn_set, results_limit_per_mpn = 10) 
 
 # #Build a basic spreadsheet with the average historical sale price of each motherboard and the current going price for "for parts" motherboards 
-    buildMotherboardSpreadsheet(modified_broad_search_results, motherboard_used_pricing_results_by_mpn)
+    buildMotherboardSpreadsheet(modified_broad_search_results, motherboard_used_pricing_results_by_mpn, output_excel_sheet_name=output_excel_file_name)
     # with open(output_csv_file_name, "w", newline='') as output_csvfile:
         # writer = csv.writer(output_csvfile)
         # writer.writerows(data)
 
+    return
 
 
 def getMotherboardDetailsByItemID(item_id: str, log_no_mpn_api_response = True, ignore_no_mpn_exception = False) -> tuple[str, str, str]:
@@ -207,8 +209,6 @@ def buildMotherboardSpreadsheet(motherboard_data: dict, motherboard_used_pricing
     
     #Returns a list of lists, where each list is a row and inside are the values for each column
     '''
-    COLUMN_LABELS = ["CHECKED", "BUYABLE", "EST. RETURN", "EST. RETURN %" , "BRAND", "NAME", "LISTING TITLE", "LISTING TYPE", "PRICE", "CUR AVG USED PRICE", "CUR MIN USED PRICE", "CUR MAX USED PRICE", "LISTING LINK"]
-
     list_of_new_rows = [COLUMN_LABELS]
     empty_val_keyword = 0.0
 
@@ -219,8 +219,6 @@ def buildMotherboardSpreadsheet(motherboard_data: dict, motherboard_used_pricing
         new_row[COLUMN_LABELS.index("CHECKED")] = "FALSE"
         new_row[COLUMN_LABELS.index("BUYABLE")] = "FALSE"
         new_row[COLUMN_LABELS.index("BRAND")] = item_listing["brand"] if "brand" in item_listing else empty_val_keyword
-        listing_title = item_listing["title"] if "title" in item_listing else "Unknown"
-        new_row[COLUMN_LABELS.index("LISTING TITLE")] = "=HYPERLINK(" + chr(COLUMN_LABELS.index("LISTING LINK")) + str(item_row+2)+ "," + f"\"{listing_title}\")" if "itemWebUrl" in item_listing else listing_title
         new_row[COLUMN_LABELS.index("LISTING TYPE")] = ",".join(item_listing["buyingOptions"]) if "buyingOptions" in item_listing else empty_val_keyword
         
         #pricing = direct pricing + shipping costs if any 
@@ -233,8 +231,12 @@ def buildMotherboardSpreadsheet(motherboard_data: dict, motherboard_used_pricing
 
         #Excel hyper link formatting 
         if ("itemWebUrl" in item_listing and len(item_listing["itemWebUrl"]) > 0):
-            hyper_link = item_listing["itemWebUrl"] if "itemWebUrl" in item_listing else empty_val_keyword
-            new_row[COLUMN_LABELS.index("LISTING LINK")] = hyper_link.split("?")[0]
+            hyper_link = item_listing["itemWebUrl"].split("?")[0] if "itemWebUrl" in item_listing else empty_val_keyword
+            new_row[COLUMN_LABELS.index("LISTING LINK")] = hyper_link
+
+        listing_title = item_listing["title"] if "title" in item_listing else "Unknown"
+        new_row[COLUMN_LABELS.index("LISTING TITLE")] = "=HYPERLINK(\"" + hyper_link + "\"," + f"\"{listing_title}\")" if "itemWebUrl" in item_listing else listing_title
+        
 
         #Formatting in reference pricing details of used motherboards of this mpn type currently for sale 
         if ("mpn" in item_listing and item_listing["mpn"] != ""):
@@ -259,32 +261,73 @@ def buildMotherboardSpreadsheet(motherboard_data: dict, motherboard_used_pricing
 
     #If a spreadsheet already exists with the given csv file name, add its data to the current data set (skip duplicates = use the most recent acquisition of that data)
     if (output_excel_sheet_name in os.listdir() and os.path.isfile(output_excel_sheet_name)):
-        mergeDataToExistingExcelSheet(list_of_new_rows, output_excel_sheet_name)
+        mergeNewDataToExistingExcelSheet(list_of_new_rows[1:], output_excel_sheet_name) #don't include header row (first row) in list of data
+    else:
+        print("\nNEW Data Entries Captures...")
+        excel_workbook = openpyxl.Workbook()
+        active_excel_sheeet = excel_workbook.active
+        for row_of_data in list_of_new_rows:
+            active_excel_sheeet.append(row_of_data)
+        print(f"{row_of_data[COLUMN_LABELS.index('LISTING TITLE')].split(',', maxsplit=1)[1]}; {row_of_data[COLUMN_LABELS.index('LISTING LINK')]}")
+        excel_workbook.save(filename= output_excel_sheet_name)
+        excel_workbook.close()
 
 
 
-def mergeDataToExistingExcelSheet(new_data: list, existing_sheet_name: str):
+def mergeNewDataToExistingExcelSheet(new_data_rows: list[list], existing_sheet_name: str):
     excel_workbook = openpyxl.load_workbook(filename= existing_sheet_name)
     active_excel_sheet = excel_workbook.active 
 
-    #put new data into dict because we love hashmaps! 
+#Put new data into dict because we love hashmaps! 
         #(hashmap is nice for this next part but probably not technically necessary)
     new_data_map_link_to_array_position = {}
-    for i, new_data_row in enumerate(new_data[1:]): #skip first row (header row)
-        new_data_map_link_to_array_position[new_data_row[COLUMN_LABELS.index("LISTING LINK")]] = i+1  
+    for i, new_data_row in enumerate(new_data_rows): 
+        new_data_map_link_to_array_position[new_data_row[COLUMN_LABELS.index("LISTING LINK")]] = i  #store array index of the ebay listing 
             #using LISTING LINK as key (the link to the listing)
                 # it should be unique for each item (which will help for checking duplicates in the next portion of code)
                 # AND I don't expect that to change when rescanning the same listing.  
 
 
+#Try to merge new rows to the existing excel sheet
+        
+    #First: Handle duplicates by updating existing data with new data 
+        #(important that this doesn't change the order of existing rows)
+    print("\nDuplicate Entries Captured...\n")
+    for i, excel_row in enumerate(list(active_excel_sheet.iter_rows(min_row=2, values_only=True)), start=2): 
+        #Check entry's listing link vs new data listing links
+        existing_list_link = excel_row[COLUMN_LABELS.index("LISTING LINK")]
 
-    #check and update duplicates part
-    existing_rows = {}
-    active_excel_sheet.row_dimensions
-    for i, line in enumerate(list(active_excel_sheet.iter_rows(min_row=2, values_only=True))): 
-        active_excel_sheet.cell(row=i+1, column=1).value = 5 #replaces the value of all cells in the collumn #1 (excel sheet is 1 indexed not 0 index) with the value specified value
+        if (existing_list_link in new_data_map_link_to_array_position):
+            #update existing excel data entry
 
+            #remove existing entry from the dictionary since we know now that it's a duplicate 
+            index_of_new_data_duplicate_row = new_data_map_link_to_array_position.pop(existing_list_link) 
 
+            print(f"{new_data_rows[index_of_new_data_duplicate_row][COLUMN_LABELS.index('LISTING TITLE')].split(',', maxsplit=1)[1]}; {new_data_rows[index_of_new_data_duplicate_row][COLUMN_LABELS.index('LISTING LINK')]}")
+            
+            for col in range(0, len(COLUMN_LABELS)): 
+                if (col+1 == COLUMN_LABELS.index("LISTING TITLE")):
+                    continue
+                active_excel_sheet.cell(row = i, column = col+1).value = new_data_rows[index_of_new_data_duplicate_row][col]
+
+    #new_data_rows without duplicates, relative to the existing worksheet removed 
+    new_data_rows = [row for row in new_data_rows if row[COLUMN_LABELS.index("LISTING LINK")] in new_data_map_link_to_array_position]
+
+    #Second: Add all remaining new data rows as true new rows
+    print("\nNEW Data Entries Captures...")
+    for new_data_row in new_data_rows:
+        print(f"{new_data_row[COLUMN_LABELS.index('LISTING TITLE')].split(',', maxsplit=1)[1]}; {new_data_row[COLUMN_LABELS.index('LISTING LINK')]}")
+
+# "=HYPERLINK(" + chr(ord("A") + COLUMN_LABELS.index("LISTING LINK")) + str(item_row+2)+ "," + f"\"{listing_title}\")" if "itemWebUrl" in item_listing else listing_title
+        #new_listing_title_hyper_link = "=HYPERLINK(" + "[@[LISTING LINK]]," + new_data_row[COLUMN_LABELS.index('LISTING TITLE')].split(',', maxsplit=1)[1]
+        #new_data_row[COLUMN_LABELS.index("LISTING TITLE")] = new_listing_title_hyper_link
+
+#AN44, AN43, AM43, AM42
+        active_excel_sheet.append(new_data_row)
+
+#Save changes to excel sheet
+    excel_workbook.save(filename= existing_sheet_name)
+    excel_workbook.close()
     return
 
 

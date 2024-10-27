@@ -2,9 +2,10 @@
 import os 
 import requests
 import json
+import urllib
 
 # from ebayAPI import API_KEY
-from ebayAPI import AUTH_TOKEN
+from ebayAPI import AUTH_TOKEN, CONTEXT_LOCATION
 
 BROWSE_SUMMARY_API_BASE = "https://api.ebay.com/buy/browse/v1/item_summary/search?"
 # HISTORICAL_INSIGHT_API_BASE = "https://api.ebay.com/buy/marketplace_insights/v1_beta/item_sales/search?"
@@ -29,7 +30,7 @@ def util_APIFromRawURL(url: str, output_file_name: str):
         headers = {
             "Authorization": "Bearer " + AUTH_TOKEN,
             "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
-            "X-EBAY-C-ENDUSERCTX": "affiliateCampaignId=<ePNCampaignId>,affiliateReferenceId=<referenceId>"
+            "X-EBAY-C-ENDUSERCTX": "contextualLocation=" + urllib.parse.quote_plus(CONTEXT_LOCATION)
         }
 
         response = requests.get(url, headers = headers)
@@ -61,7 +62,7 @@ def getSearchResults(request_payload: dict, log_url = False, log_output = False,
         headers = {
             "Authorization": "Bearer " + AUTH_TOKEN,
             "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
-            "X-EBAY-C-ENDUSERCTX": "affiliateCampaignId=<ePNCampaignId>,affiliateReferenceId=<referenceId>"
+            "X-EBAY-C-ENDUSERCTX": "contextualLocation=" + urllib.parse.quote_plus(CONTEXT_LOCATION)
         }
     #(DEBUGGING) test request 
         # response = requests.get('https://api.ebay.com/buy/browse/v1/item_summary/search?q=drone&limit=1&filter=price:[300..800],priceCurrency:USD,conditions:{NEW}', headers = headers )
@@ -161,7 +162,7 @@ def getItemDetails(item_id_to_inspect: str, log_url = False,  log_output = False
         headers = {
             "Authorization": "Bearer " + AUTH_TOKEN,
             "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
-            "X-EBAY-C-ENDUSERCTX": "affiliateCampaignId=<ePNCampaignId>,affiliateReferenceId=<referenceId>"
+            "X-EBAY-C-ENDUSERCTX": "contextualLocation=" + urllib.parse.quote_plus(CONTEXT_LOCATION)
         }
         #Send GET request as url
         # get_url = buildSearchURL(BROWSE_API_DETAILS, request_payload)
