@@ -31,7 +31,7 @@ GENERIC_MOBO_SEARCH_PARAMS = {
             
     # "sort": "", #sort=price from lowest to highest price (maybe behave strangely with bidding items which I need to look)
     "limit": "30", #number of items to return per page (max 200, default 50)
-    # "offset": "0" #specifies number of items to skip in result set (control pagination of the output) 
+    "offset": "30" #specifies number of items to skip in result set (control pagination of the output) 
 }
 
 USED_MOBO_SALES_SEARCH_PARAMS = {
@@ -158,7 +158,7 @@ def getUsedMotherboardPrices(motherboard_mpn_set: list, results_limit_per_mpn = 
             return
 
         #Calculate relevant pricing from recent sales      
-        min_price, max_price, avg_price = ebayAPIFuncLib.util_CompileSalePriceStatsOfSearchResults(search_results["itemSummaries"])
+        min_price, max_price, avg_price = ebayAPIFuncLib.util_CompileSalePriceStatsOfSearchResults(search_results["itemSummaries"]) if "itemSummaries" in search_results else (0,0,0)
 
         #Categorize the following motherboard historical pricing data 
         used_motherboard_current_sale_pricing[mobo_mpn] = {"min_price": min_price,
@@ -336,7 +336,7 @@ def main():
     arguments_passed = len(sys.argv)
 
     #first argument will be path (and name) to a file that will become the .csv output log
-    if (arguments_passed > 0):
+    if (arguments_passed > 1):
         csv_output_file = sys.argv[1]
     else:
         csv_output_file = "motherboard_data" + str(datetime.date(datetime.now())) + ".csv"

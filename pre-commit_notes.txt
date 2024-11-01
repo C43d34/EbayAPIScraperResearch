@@ -1,17 +1,3 @@
-- Feature Add:
-    Location context for search & improved shipping cost capturing
-        - Properly included the "X-EBAY-C-ENDUSERCTX" header into api calls. Useful for location based stuff such as calculated shipping 
-        - Add the following variable to ebayAPI.py file
-        "CONTEXT_LOCATION" = "country=<your two letter country code>,zip=<your zip code>"
-        (otherwise, will assume this header blank)
 
-    Command arguments option:
-        - output excel file name & path
-        (can specify "mobo_research.py")
-            - If the file already exists, the program will append any new found listing to the excel sheet, while updating existing ones if new information is found. 
-
-
-
-            
 
 
