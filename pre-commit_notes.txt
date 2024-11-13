@@ -1,3 +1,7 @@
+QOL:
+    - Implemented flow to automatically gather application auth token
+        api calls automatically check to see if application token has expired, makes an oauth request to EBAY for a new one if true
 
+    
 
 

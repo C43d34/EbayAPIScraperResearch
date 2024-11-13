@@ -31,7 +31,7 @@ GENERIC_MOBO_SEARCH_PARAMS = {
             
     # "sort": "", #sort=price from lowest to highest price (maybe behave strangely with bidding items which I need to look)
     "limit": "30", #number of items to return per page (max 200, default 50)
-    "offset": "30" #specifies number of items to skip in result set (control pagination of the output) 
+    "offset": "0" #specifies number of items to skip in result set (control pagination of the output) 
 }
 
 USED_MOBO_SALES_SEARCH_PARAMS = {
@@ -49,7 +49,7 @@ USED_MOBO_SALES_SEARCH_PARAMS = {
         }, 
             
     # "sort": "", #sort=price from lowest to highest price (maybe behave strangely with bidding items which I need to look)
-    "limit": "7", #number of items to return per page (max 200, default 50)
+    "limit": "10", #number of items to return per page (max 200, default 50)
     # "offset": "0" #specifies number of items to skip in result set (control pagination of the output) 
 }
 
@@ -340,6 +340,7 @@ def main():
         csv_output_file = sys.argv[1]
     else:
         csv_output_file = "motherboard_data" + str(datetime.date(datetime.now())) + ".csv"
+
 
     compileMotherboardData(csv_output_file)
     return
